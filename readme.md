@@ -1,4 +1,4 @@
-# Map Seach Overlay Beta 
+# Map Search Overlay Beta 
 
 - Run `python3 app.py`
 - Open `127.0.0.1/8000` on your browser
