@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real Estate Developer Experience Platform</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&libraries=places"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        #map {
+            height: 600px;
+            width: 100%;
+        }
+        .label-overlay {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 2px 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        /* Form Styles */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+        }
+        .form-container {
+            max-width: 400px;
+            margin: 30px auto;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 30px 40px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        h2 {
+            margin-bottom: 20px;
+            font-weight: 500;
+            font-size: 28px;
+        }
+        label {
+            display: block;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: none;
+            border-bottom: 2px solid #4a90e2;
+            font-size: 16px;
+            font-family: 'Roboto', sans-serif;
+            color: #555;
+            background: none;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        input[type="submit"] {
+            margin-top: 20px;
+            padding: 10px 20px;
+            border: none;
+            background: #4a90e2;
+            color: #fff;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="form-container">
+    <h2>Map Search Beta</h2>
+    <form action="/map" method="post">
+        <label for="location">Enter Apartment, City:</label>
+        <input type="text" id="location" name="location" required>
+        <br><br>
+        <input type="submit" value="Search">
+    </form>
+</div>
+
+<script>
+    var map;
+    var markers = [];
+
+    function initMap(lat, lng, places) {
+        // Center map on the apartment location
+        var center = {lat: lat, lng: lng};
+
+        map = new google.maps.Map(document.getElementById('map'), {
+             zoom: 17.9, // Updated zoom level
+            center: center,
+            mapTypeId: 'satellite'  // Set the default view to satellite
+        });
+
+
+        // Add marker for the apartment with an arrow icon
+        addMarker(center, 'Apartment', 'apartment', true);
+
+        // Add markers for nearby places
+        for (var placeType in places) {
+            for (var i = 0; i < places[placeType].length; i++) {
+                var place = places[placeType][i].geometry.location;
+                addMarker(place, places[placeType][i].name, placeType);
+            }
+        }
+    }
+
+    function addMarker(location, title, placeType, isApartment = false) {
+        var iconUrl;
+
+        if (isApartment) {
+            iconUrl = "http://maps.google.com/mapfiles/arrow.png";
+        } else {
+            switch (placeType) {
+                case "hospital":
+                    iconColor = "red";
+                    break;
+                case "school":
+                    iconColor = "green";
+                    break;
+                case "bus_stop":
+                    iconColor = "blue";
+                    break;
+                case "subway_station":
+                    iconColor = "yellow";
+                    break;
+                default:
+                    iconColor = "black";  // Default color
+            }
+            iconUrl = `http://maps.google.com/mapfiles/ms/icons/${iconColor}-dot.png`;
+        }
+
+        var marker = new google.maps.Marker({
+            position: location,
+            map: map,
+            title: title,
+            icon: iconUrl
+        });
+        markers.push(marker);
+        new CustomLabel(map, location, title); // create overlay label
+    }
+
+    function CustomLabel(map, position, text) {
+        this.position = position;
+        this.text = text;
+        this.map = map;
+        this.div = null;
+        this.setMap(map);
+    }
+
+    CustomLabel.prototype = new google.maps.OverlayView();
+
+    CustomLabel.prototype.onAdd = function() {
+        var div = document.createElement('div');
+        div.className = 'label-overlay';
+        div.innerHTML = this.text;
+
+        this.div = div;
+
+        var panes = this.getPanes();
+        panes.overlayLayer.appendChild(div);
+    };
+
+    CustomLabel.prototype.draw = function() {
+        var overlayProjection = this.getProjection();
+        var position = overlayProjection.fromLatLngToDivPixel(this.position);
+
+        var div = this.div;
+        div.style.left = position.x + 'px';
+        div.style.top = position.y - 20 + 'px'; // 20px above marker
+    };
+
+    CustomLabel.prototype.onRemove = function() {
+        this.div.parentNode.removeChild(this.div);
+        this.div = null;
+    };
+
+    // Fetch data from server when page loads
+    fetch('/get_places', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            location: "{{ session.get('location') }}" // Replace this with actual user input or dynamic data
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        initMap(data.latlng.lat, data.latlng.lng, data.places);
+    });
+</script>
+
+</body>
+</html>
